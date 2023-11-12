@@ -3,8 +3,8 @@ import sys
 import logging
 import traceback
 
-import wexpect.console_reader as console_reader
-import wexpect.wexpect_util as wexpect_util
+import wexpect_venv.console_reader as console_reader
+import wexpect_venv.wexpect_util as wexpect_util
 
 
 logger = logging.getLogger('wexpect')

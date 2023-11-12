@@ -1195,7 +1195,7 @@ class Wtty:
         commandLine = '"%s" %s "%s"' % (python_executable,
                                         ' '.join(pyargs),
                                         f"import sys; sys.path = {spath} + sys.path;"
-                                        f"args = {args}; import wexpect;"
+                                        f"args = {args}; import wexpect_venv as wexpect;"
                                         f"wexpect.ConsoleReader(wexpect.join_args(args), {pid}, {tid}, cp={cp}, logdir={logdir})"
                                         )
 
