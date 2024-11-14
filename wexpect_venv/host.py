@@ -1,4 +1,4 @@
-"""Host module contains calsses and functions for the host application. These will spawn the child
+"""Host module contains classes and functions for the host application. These will spawn the child
 application. These host classes (and some util classes) are the interface for the user. Handle other
 modules as protected.
 """
@@ -148,11 +148,13 @@ def run(command, timeout=-1, withexitstatus=False, events=None, extra_args=None,
     else:
         return child_result
 
+        return s.decode(encoding=self.encoding, errors=self.decode_errors)
 
 class SpawnBase:
-    def __init__(self, command, args=[], timeout=30, maxread=60000, searchwindowsize=None,
-                 logfile=None, cwd=None, env=None, codepage=None, echo=True, safe_exit=True,
-                 interact=False, coverage_console_reader=False, **kwargs):
+    def __init__(self, command, args=[], timeout=30, encoding='UTF-8', decode_errors='ignore',
+                 maxread=60000, searchwindowsize=None, logfile=None, cwd=None, env=None,
+                 codepage=None, echo=True, safe_exit=True, interact=False,
+                 coverage_console_reader=False, **kwargs):
         """This starts the given command in a child process. This does all the
         fork/exec type of stuff for a pty. This is called by __init__. If args
         is empty then command will be parsed (split on spaces) and args will be
@@ -172,6 +174,8 @@ class SpawnBase:
         self.console_pid = None
         self.child_process = None
         self.child_pid = None
+        self.encoding = encoding
+        self.decode_errors = decode_errors
 
         self.safe_exit = safe_exit
         self.searcher = None
@@ -354,7 +358,7 @@ class SpawnBase:
                 wexpect_executable = os.environ['WEXPECT_EXECUTABLE']
             except KeyError:
                 dirname = os.path.dirname(sys.executable)
-                wexpect_executable = os.path.join(dirname, '..', 'wexpect', 'wexpect.exe')
+                wexpect_executable = os.path.abspath(os.path.join(dirname, '..', 'wexpect', 'wexpect.exe'))
 
             if not os.path.exists(wexpect_executable):
                 logger.error(f'ExceptionPexpect: Wexpect executable: >>{wexpect_executable}<< not found.')
@@ -379,7 +383,7 @@ class SpawnBase:
             spath = ';'.join(spath)
             environ['PYTHONPATH'] = f'{spath};{python_path}'
 
-            child_class_initializator = f"wexpect {console_args}"
+            child_class_initializator = f"wexpect_venv {console_args}"
 
             pyargs = ' '.join(pyargs)
             commandLine = f'"{python_executable}" {pyargs} {child_class_initializator}'
@@ -871,8 +875,8 @@ class SpawnPipe(SpawnBase):
                  **kwargs):
         self.pipe = None
         self.console_class_name = 'ConsoleReaderPipe'
-        self.pipe_file_name = f'wexpect_{generate_id()}'
-        self.console_class_parameters = {'pipe_file_name': self.pipe_file_name}
+        self.pipe_file_suffix = f'_{generate_id()}'
+        self.console_class_parameters = {'pipe_file_suffix': self.pipe_file_suffix}
 
         super().__init__(
             command=command, args=args, timeout=timeout, maxread=maxread,
@@ -891,7 +895,8 @@ class SpawnPipe(SpawnBase):
         else:
             end_time = time.time() + timeout
 
-        pipe_full_path = r'\\.\pipe\{}'.format(self.pipe_file_name)
+        pipe_name = 'wexpect_{}{}'.format(self.console_pid, self.pipe_file_suffix)
+        pipe_full_path = r'\\.\pipe\{}'.format(pipe_name)
         logger.debug(f'Trying to connect to pipe: {pipe_full_path}')
         while True:
             if end_time < time.time():
@@ -951,7 +956,7 @@ class SpawnPipe(SpawnBase):
                 logger.info("EOF: EOF character has been arrived")
                 s = s.split(EOF_CHAR)[0]
 
-            return s.decode()
+            return s.decode(encoding=self.encoding, errors=self.decode_errors)
         except pywintypes.error as e:
             if e.args[0] == winerror.ERROR_BROKEN_PIPE:   # 109
                 self.flag_eof = True
@@ -1078,7 +1083,7 @@ class SpawnSocket(SpawnBase):
         except socket.timeout:
             return ''
 
-        return s.decode()
+        return s.decode(encoding=self.encoding, errors=self.decode_errors)
 
 
 class searcher_re (object):

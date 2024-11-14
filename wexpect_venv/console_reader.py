@@ -77,6 +77,7 @@ class ConsoleReaderBase:
         self.enable_signal_chars = True
         self.timeout = 30
         self.child_exitstatus = None
+        self.pipe_file_suffix = kwargs.get("pipe_file_suffix")
 
         logger.info(f'ConsoleReader started. location {os.path.abspath(__file__)}')
 
@@ -97,7 +98,10 @@ class ConsoleReaderBase:
             logger.info('Spawning %s' % path)
             try:
                 self.initConsole()
-                self.child_process = psutil.Popen(path)
+                si = win32process.GetStartupInfo()
+                self.__childProcess, _, self.child_pid, self.child_tid = win32process.CreateProcess(
+                    None, path, None, None, False, 0, None, None, si)
+                self.child_process = psutil.Process(self.child_pid)
 
                 logger.info(f'Child pid: {self.child_pid}  Console pid: {self.console_pid}')
 
@@ -134,12 +138,10 @@ class ConsoleReaderBase:
                 logger.info('Host process has been died.')
                 return
 
-            try:
-                self.child_exitstatus = self.child_process.wait(0)
+            self.child_exitstatus = win32process.GetExitCodeProcess(self.__childProcess)
+            if self.child_exitstatus != win32con.STILL_ACTIVE:
                 logger.info(f'Child finished with code: {self.child_exitstatus}')
                 return
-            except psutil.TimeoutExpired:
-                pass
 
             consinfo = self.consout.GetConsoleScreenBufferInfo()
             cursorPos = consinfo['CursorPosition']
@@ -514,12 +516,11 @@ class ConsoleReaderPipe(ConsoleReaderBase):
         else:
             end_time = time.time() + timeout
 
-        try:
-            self.pipe_name = kwargs['pipe_file_name']
-        except KeyError:
-            self.pipe_name = 'wexpect_{}'.format(self.console_pid)
+        pipe_name = 'wexpect_{}'.format(self.console_pid)
+        if self.pipe_file_suffix:
+            pipe_name += self.pipe_file_suffix
 
-        pipe_full_path = r'\\.\pipe\{}'.format(self.pipe_name)
+        pipe_full_path = r'\\.\pipe\{}'.format(pipe_name)
         logger.info('Start pipe server: %s', pipe_full_path)
         self.pipe = win32pipe.CreateNamedPipe(
             pipe_full_path,
